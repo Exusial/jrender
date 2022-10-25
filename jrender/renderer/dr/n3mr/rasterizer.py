@@ -46,7 +46,8 @@ class N3mrRasterizer(nn.Module):
         vertices = mesh.vertices
         faces = mesh.faces
         textures = mesh.textures
-        
+        vertex_colors = mesh.vertex_colors
+
         if mode is None:
             return self.render(vertices, faces, textures)
         elif mode == 'rgb':
@@ -55,6 +56,8 @@ class N3mrRasterizer(nn.Module):
             return self.render_silhouettes(vertices, faces)
         elif mode == 'depth':
             return self.render_depth(vertices, faces)
+        elif mode == 'vertex_color' and vertex_colors is not None:
+            return self.render_vertex(vertices, faces, vertex_colors)
         else:
             raise ValueError("mode should be one of None, 'silhouettes' or 'depth'")
 
@@ -78,6 +81,19 @@ class N3mrRasterizer(nn.Module):
         images = rasterize_depth(faces, self.image_size, self.anti_aliasing)
         return images
 
+    def render_vertex(self, vertices, faces, vertex_colors):
+        # fill back
+        if self.fill_back:
+            faces = jt.contrib.concat((faces, faces[:, :, list(reversed(range(faces.shape[-1])))]), dim=1).stop_grad()
+
+        # rasterization
+        face_index = faces
+        faces = vertices_to_faces(vertices, faces)
+        images = rasterize_vertex_color(
+            faces, vertex_colors, face_index, self.image_size, self.anti_aliasing, self.near, self.far, self.rasterizer_eps,
+            self.background_color)
+        return images
+
     def render_rgb(self, vertices, faces, textures):
         # fill back
         if self.fill_back:
@@ -90,7 +106,7 @@ class N3mrRasterizer(nn.Module):
             faces, textures, self.image_size, self.anti_aliasing, self.near, self.far, self.rasterizer_eps,
             self.background_color)
         return images
-
+    
     def render(self, vertices, faces, textures):
         # fill back
         if self.fill_back:

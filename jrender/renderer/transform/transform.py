@@ -114,3 +114,6 @@ class Transform(nn.Module):
     @property
     def eyes(self):
         return self.transformer._eye
+    
+    def set_projection_matrix(self, K, R, t, orig_size=800):
+        self.transformer = Projection(K, R, t, orig_size=800)

@@ -1,6 +1,6 @@
 import numpy as np
 import jittor as jt
-
+import trimesh
 from ..io import *
 from .utils import *
 
@@ -26,7 +26,7 @@ class Mesh(object):
                 - face_textures' shape is [batch_size, num_faces, texture_res, texture_res, texture_res, 3] 
         * surface_normals: the normals of all surfaces. Shape is [batch_size, num_faces, 3]
         * vertex_normals: the normals of all vertices. Shape is [batch_size, num_vertices, 3]
-
+        * vertex_colors: the color of all vertices (Optional)
     Functions:
         faces: set faces
         vertices: set vertices
@@ -37,7 +37,7 @@ class Mesh(object):
         save_obj: save a mesh to one .obj file
         voxelize: voxelize the vertices to voxel space
     '''
-    def __init__(self, vertices, faces, textures=None, texture_res=1, texture_type='surface', dr_type='softras', metallic_textures=None, roughness_textures=None,normal_textures=None,TBN=None,with_SSS=False,face_texcoords=None):
+    def __init__(self, vertices, faces, textures=None, texture_res=1, texture_type='surface', dr_type='softras', metallic_textures=None, roughness_textures=None,normal_textures=None,TBN=None,with_SSS=False,face_texcoords=None,vertex_colors=None):
         '''
         vertices, faces and textures (if not None) are expected to be Tensor objects
         '''
@@ -61,7 +61,7 @@ class Mesh(object):
         self.batch_size = self._vertices.shape[0]
         self.num_vertices = self._vertices.shape[1]
         self.num_faces = self._faces.shape[1]
-
+        
         self._face_vertices = None
         self._face_vertices_update = True
         self._surface_normals = None
@@ -79,7 +79,8 @@ class Mesh(object):
 
         self._fill_back = False
         self.dr_type = dr_type
-
+        self.vertex_colors = vertex_colors
+        
         if texture_type == 'surface':
             if self.dr_type == 'softras':
                 self._metallic_textures = jt.zeros((self.batch_size, self.num_faces, texture_res**2, 1))
@@ -328,3 +329,9 @@ class Mesh(object):
     def voxelize(self, voxel_size=32):
         face_vertices_norm = self.face_vertices * voxel_size / (voxel_size - 1) + 0.5
         return voxelization(face_vertices_norm, voxel_size, False)
+
+    @classmethod
+    def from_ply(cls, filename_obj, dr_type='n3mr', normalization=False):
+        # TODO: add texture support for ply file
+        mesh = trimesh.load_mesh(filename_obj, process=False, normalized=normalization)
+        return cls(np.asarray(mesh.vertices), np.asarray(mesh.faces), dr_type=dr_type, vertex_colors=np.asarray(mesh.visual.vertex_colors))
